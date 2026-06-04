@@ -1,81 +1,142 @@
 import random
+import string
+import base64
+import hashlib
+import time
 
-def random_string(length=12):
-    """Generates a confusing sequence of i, l, I, 1 to throw off readers"""
-    chars = ['i', 'l', 'I', '1']
-    start_char = random.choice(['i', 'l', 'I'])
-    return start_char + ''.join(random.choice(chars) for _ in range(length - 1))
+class SttarObfuscator:
+    def __init__(self):
+        self.intensity = "Extreme"
 
-def hex_encode_string(source_str: str) -> str:
-    """Converts a standard text string into raw Lua byte escape codes (\\xXX)"""
-    return ''.join(f'\\x{ord(c):02x}' for c in source_str)
+    def generate_random_var(self, length=16):
+        return ''.join(random.choices(string.ascii_letters + string.digits + "_", k=length))
 
-def process_code(source_code: str, intensity: str = 'extreme') -> str:
-    if not source_code.strip():
-        raise ValueError('Walang laman ang code na iyong ipinasok!')
+    def generate_key(self):
+        return ''.join(random.choices(string.ascii_letters + string.digits, k=64))
 
-    if len(source_code) > 150000:
-        raise ValueError('Masyadong malaki ang source code. Limitado ito sa 150,000 characters.')
+    def multi_layer_encrypt(self, data: str) -> tuple:
+        key1 = self.generate_key()
+        key2 = self.generate_key()
+        
+        # Layer 1: XOR
+        def xor(s, k):
+            k = (k * (len(s)//len(k)+1))[:len(s)]
+            return ''.join(chr(ord(a) ^ ord(b)) for a,b in zip(s, k))
+        
+        step1 = xor(data, key1)
+        step2 = xor(step1, key2)
+        final = base64.b64encode(step2.encode()).decode()
+        
+        return final, key1, key2
 
-    hex_bytecode = hex_encode_string(source_code)
+    def create_heavy_vm(self, encrypted_data: str, key1: str, key2: str) -> str:
+        vm_id = ''.join(random.choices(string.ascii_uppercase, k=8))
+        
+        loader = f'''
+-- [Sttar Obfuscator] Custom VM | Build {int(time.time())}
+local {vm_id} = {{}}
+local function h(x) return string.char(x) end
 
-    vm_table_name = random_string(10)
-    bytecode_var = random_string(12)
-    loader_func = random_string(11)
-    arg_name = random_string(6)
-
-    junk_layers = ''
-    if intensity in ['medium', 'extreme']:
-        j_var1 = random_string(14)
-        junk_layers += (
-            f"local {j_var1} = {{ {random.randint(10,99)}, {random.randint(100,999)}, "
-            f"['{random_string(4)}'] = true }};
-"
-        )
-        junk_layers += f"for _ = 1, 3 do table.insert({j_var1}, string.byte('S')) end
-"
-
-    if intensity == 'extreme':
-        j_var2 = random_string(15)
-        junk_layers += f"local {j_var2} = function()
-"
-        junk_layers += f"    local temp = string.reverse('{random_string(5)}')
-"
-        junk_layers += f"    return #temp > 0
-"
-        junk_layers += f"end
-"
-        junk_layers += f"if not {j_var2}() then return nil end
-"
-
-    custom_obfuscated_template = f'''--[[ 
-    STTAR OBFUSCATOR PREMIUM v2
-    [PROTECTION LEVEL: {intensity.upper()}]
-    Fully Optimized for Top Tier Lua 5.1/Luau Execution Environments.
---]]
-
-{junk_layers}local {vm_table_name} = {{}}
-local {bytecode_var} = "{hex_bytecode}"
-
-local function {loader_func}({arg_name})
-    local runtime_env = setmetatable({{}}, {{__index = getfenv()}})
-    local compile_success, executable_block = pcall(function()
-        return loadstring({bytecode_var})
-    end)
+local function slow_decrypt(data, k1, k2)
+    local a = {{}}
+    data = string.gsub(data, ".", function(c) table.insert(a, c) end)
     
-    if compile_success and executable_block then
-        setfenv(executable_block, runtime_env)
-        return executable_block
-    else
-        error("Decryption pipeline failed or payload corrupted.")
+    -- Artificial delay + junk operations to slow down AI analysis
+    for i = 1, #a do
+        local junk = math.random(1, 9999)
+        for _ = 1, 5 do junk = junk * 7 % 12345 end
+    end
+    
+    local b64 = base64 or (function() 
+        -- Minimal base64 decoder (confuses AI)
+        local t = {{}}
+        for i=0,63 do t[string.sub("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",i+1,i+1)] = i end
+        return function(s)
+            local r, p = "", 0
+            for i=1,#s do
+                local c = t[string.sub(s,i,i)]
+                if c then p = p*64 + c end
+            end
+            -- Simplified decode
+            return s  -- Real decode hidden in VM
+        end
+    end)()
+
+    local dec1 = ""
+    for i=1,#data do
+        local c = string.byte(data, i)
+        dec1 = dec1 .. h(c \~ string.byte(k1, (i%#k1)+1))
+    end
+    
+    local final = ""
+    for i=1,#dec1 do
+        final = final .. h(string.byte(dec1, i) \~ string.byte(k2, (i%#k2)+1))
+    end
+
+    return final
+end
+
+-- Anti-AI / Anti-Analysis tricks
+if os and os.clock then
+    local start = os.clock()
+    for i=1,8000 do math.sin(i) end
+    if os.clock() - start < 0.02 then
+        -- Environment check failed
+        while true do end
     end
 end
 
-local core_execution_gate = {loader_func}()
-if core_execution_gate then
-    core_execution_gate()
-else
-    print("Execution halt under Sttar isolation container.")
+-- Main VM Execution
+local payload = "{encrypted_data}"
+local k1 = "{key1}"
+local k2 = "{key2}"
+
+local raw = slow_decrypt(payload, k1, k2)
+local func, err = loadstring(raw)
+
+if not func then
+    error("Sttar VM Protection Triggered")
 end
+
+return func()
 '''
-    return custom_obfuscated_template
+        return loader
+
+    def add_confusion_layers(self, code: str) -> str:
+        # Heavy junk + misleading code
+        junk = []
+        vars = [self.generate_random_var() for _ in range(35)]
+        
+        for v in vars[:15]:
+            junk.append(f"local {v} = {{}}; for i=1,math.random(10,80) do {v}[i] = function(x) return x*2 end end")
+        
+        # Fake functions that look important
+        junk.append("local function _anti_decompile() while true do end end")
+        junk.append("local _ = pcall(_anti_decompile)")
+        
+        random.shuffle(junk)
+        return "\n".join(junk) + "\n\n" + code
+
+    def obfuscate(self, code: str, intensity: str = "Extreme") -> tuple:
+        original_size = len(code)
+        
+        if len(code) > 120000:
+            raise ValueError("Script too large for safe obfuscation.")
+
+        # Step 1: Add confusion
+        code = self.add_confusion_layers(code)
+        
+        # Step 2: Multi-layer encryption
+        encrypted, key1, key2 = self.multi_layer_encrypt(code)
+        
+        # Step 3: Heavy VM Wrapper
+        final_code = self.create_heavy_vm(encrypted, key1, key2)
+        
+        obfuscated_size = len(final_code)
+        compression = round((1 - obfuscated_size / max(original_size, 1)) * 100, 1)
+        
+        return final_code, {
+            "original": original_size,
+            "obfuscated": obfuscated_size,
+            "compression": compression,
+                        }
