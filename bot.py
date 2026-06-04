@@ -101,8 +101,7 @@ async def obfuscate(interaction: discord.Interaction, code: str, intensity: app_
     except Exception as e:
         error_embed = discord.Embed(
             title="❌ **PROCESS ERROR**",
-            description=f"Naranasan ang sumusunod na error habang pinoproseso:
-`{str(e)}`",
+            description=f"Naranasan ang sumusunod na error habang pinoproseso: `{str(e)}`",
             color=0xFF0000
         )
         await interaction.edit_original_response(embed=error_embed)
