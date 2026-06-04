@@ -71,8 +71,11 @@ async def obfuscate(interaction: discord.Interaction, code: str, intensity: app_
         new_size = len(obfuscated_code)
         
         # Calculate size expansion percentage
-        change = round(((new_size - original_size) / original_size) * 100, 1)
-        change_str = f"+{change}%" if change > 0 else f"{change}%"
+        if original_size > 0:
+            change = round(((new_size - original_size) / original_size) * 100, 1)
+            change_str = f"+{change}%" if change > 0 else f"{change}%"
+        else:
+            change_str = "N/A"
 
         # Create a clean file object in memory
         file_bytes = BytesIO(obfuscated_code.encode('utf-8'))
@@ -101,7 +104,7 @@ async def obfuscate(interaction: discord.Interaction, code: str, intensity: app_
     except Exception as e:
         error_embed = discord.Embed(
             title="❌ **PROCESS ERROR**",
-            description=f"Naranasan ang sumusunod na error habang pinoproseso: `{str(e)}`",
+            description=f"An error occurred while processing: `{str(e)}`",
             color=0xFF0000
         )
         await interaction.edit_original_response(embed=error_embed)
