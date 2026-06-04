@@ -4,6 +4,7 @@ from discord.ext import commands
 import asyncio
 import os
 import random
+import time
 from io import BytesIO
 from datetime import datetime
 from flask import Flask
@@ -18,11 +19,13 @@ def home():
     return "Sttar Obfuscator is running!"
 
 def run_flask():
-    # Standard port for Render deployments
-    app.run(host='0.0.0.0', port=10000)
+    # Use the port Render assigns (default 10000)
+    port = int(os.environ.get("PORT", 10000))
+    # Disable reloader to avoid thread issues, enable threading for concurrency
+    app.run(host='0.0.0.0', port=port, use_reloader=False, threaded=True)
 
 def keep_alive():
-    t = Thread(target=run_flask)
+    t = Thread(target=run_flask, daemon=True)
     t.start()
 
 # --- Discord Bot Setup ---
@@ -70,7 +73,7 @@ async def obfuscate(interaction: discord.Interaction, code: str, intensity: app_
         obfuscated_code = process_code(code, intensity=level_value)
         new_size = len(obfuscated_code)
         
-        # Calculate size expansion percentage
+        # Calculate size expansion percentage (avoid division by zero)
         if original_size > 0:
             change = round(((new_size - original_size) / original_size) * 100, 1)
             change_str = f"+{change}%" if change > 0 else f"{change}%"
@@ -110,10 +113,13 @@ async def obfuscate(interaction: discord.Interaction, code: str, intensity: app_
         await interaction.edit_original_response(embed=error_embed)
 
 if __name__ == "__main__":
-    # Fire up the lightweight background Flask route for keeping the dyno alive
+    # Start the Flask web server in a background thread
     keep_alive()
     
-    # Fire up the Discord client instance
+    # Give Flask a moment to bind to the port before Render scans
+    time.sleep(2)
+    
+    # Start the Discord bot
     TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
     if not TOKEN:
         print("CRITICAL ERROR: Environment variable 'DISCORD_BOT_TOKEN' is empty or missing.")
