@@ -1,121 +1,109 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
 import asyncio
+import threading
+from flask import Flask
 import os
 import random
-import time
-from io import BytesIO
-from threading import Thread
-from flask import Flask
+from dotenv import load_dotenv
+from obfuscator import SttarObfuscator
 
-from obfuscator import process_code
+load_dotenv()
 
+# Flask Web Server (for Render uptime)
 app = Flask(__name__)
 
-@app.route("/")
+@app.route('/')
 def home():
-    return "Sttar Obfuscator is running!"
+    return "Sttar Obfuscator is running! ✨"
 
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, use_reloader=False, threaded=True)
+@app.route('/health')
+def health():
+    return {"status": "healthy"}, 200
 
-def keep_alive():
-    thread = Thread(target=run_flask, daemon=True)
-    thread.start()
+# Discord Bot
+intents = discord.Intents.default()
+intents.message_content = False
+client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
 
-class SttarBot(commands.Bot):
-    def __init__(self):
-        intents = discord.Intents.default()
-        super().__init__(command_prefix="!", intents=intents)
+obfuscator = SttarObfuscator()
 
-    async def setup_hook(self):
-        await self.tree.sync()
-        print("Bot is ready and slash commands are synced.")
+@client.event
+async def on_ready():
+    await tree.sync()
+    print(f"Sttar Obfuscator is online as {client.user}")
 
-bot = SttarBot()
-
-@bot.tree.command(
-    name="obfuscate",
-    description="Obfuscate your Lua/Luau script for Roblox executors."
-)
+@tree.command(name="obfuscate", description="Obfuscate Lua/Luau code with Sttar Custom VM")
 @app_commands.describe(
-    code="The Lua script you want to obfuscate",
-    intensity="Select the level of visual complexity and junk generation"
+    code="The Lua/Luau script to obfuscate",
+    intensity="Protection level"
 )
 @app_commands.choices(intensity=[
-    app_commands.Choice(name="Low - Basic Hex Scrambling", value="low"),
-    app_commands.Choice(name="Medium - Hex + Variable Mangling", value="medium"),
-    app_commands.Choice(name="Extreme - Max Obfuscation & Junk Insertion", value="extreme"),
+    app_commands.Choice(name="Extreme", value="Extreme"),
+    app_commands.Choice(name="Medium", value="Medium")
 ])
-async def obfuscate(
-    interaction: discord.Interaction,
-    code: str,
-    intensity: app_commands.Choice[str] = None
-):
+async def obfuscate(interaction: discord.Interaction, code: str, intensity: str = "Extreme"):
+    await interaction.response.defer()
+
+    # Flashy Loading Embed
     loading_embed = discord.Embed(
-        title="🔄 OBFUSCATING YOUR CODE...",
-        description="Please wait while our custom protection layers kick in...",
-        color=0xFF00FF
+        title="🔄 **OBFUSCATING YOUR CODE...**",
+        description="```Please wait while our custom VM protection kicks in... ✨```",
+        color=0xC026D3  # Neon Purple/Pink
     )
-    loading_embed.set_footer(text="Sttar Obfuscator")
+    loading_embed.set_footer(text="Sttar Obfuscator • Powered by Custom VM")
     loading_embed.timestamp = discord.utils.utcnow()
-
-    await interaction.response.send_message(embed=loading_embed)
-
-    await asyncio.sleep(2)
-
-    original_size = len(code)
-    level_value = intensity.value if intensity else "extreme"
-    level_name = intensity.name if intensity else "Extreme - Max Obfuscation & Junk Insertion"
+    await interaction.followup.send(embed=loading_embed)
 
     try:
-        obfuscated_code = process_code(code, intensity=level_value)
-        new_size = len(obfuscated_code)
-
-        if original_size > 0:
-            change = round(((new_size - original_size) / original_size) * 100, 1)
-            change_str = f"+{change}%" if change > 0 else f"{change}%"
-        else:
-            change_str = "N/A"
-
-        file_bytes = BytesIO(obfuscated_code.encode("utf-8"))
-        random_id = random.randint(100000, 999999)
-        filename = f"Sttar_Obfuscator_{random_id}.lua"
-        discord_file = discord.File(fp=file_bytes, filename=filename)
-
+        obfuscated_code, stats = obfuscator.obfuscate(code, intensity)
+        
+        rand_num = random.randint(100000, 999999)
+        filename = f"Sttar_Obfuscator_{rand_num}.lua"
+        
+        # Success Embed
         success_embed = discord.Embed(
-            title="✅ OBFUSCATION SUCCESSFUL!",
-            description="Your script has been wrapped and scrambled securely.",
-            color=0x00FF00
+            title="✅ **OBFUSCATE SUCCESS!** ✨",
+            description="Your code is now protected with **Sttar Custom VM**",
+            color=0x22C55E  # Neon Green
         )
-        success_embed.add_field(name="Original Size", value=f"`{original_size} characters`", inline=True)
-        success_embed.add_field(name="Obfuscated Size", value=f"`{new_size} characters`", inline=True)
-        success_embed.add_field(name="Code Expansion", value=f"`{change_str}`", inline=True)
-        success_embed.add_field(name="Protection Profile", value=f"`{level_name}`", inline=False)
-        success_embed.add_field(name="Executor Compatibility", value="`Lua 5.1 / Luau executors`", inline=False)
-        success_embed.set_footer(text="Sttar Obfuscator • Secured")
+        success_embed.add_field(name="📏 Original Size", value=f"`{stats['original']:,}` chars", inline=True)
+        success_embed.add_field(name="📏 Obfuscated Size", value=f"`{stats['obfuscated']:,}` chars", inline=True)
+        success_embed.add_field(name="⚡ Compression", value=f"`{stats['compression']}%`", inline=True)
+        success_embed.add_field(name="🛡️ Protection Level", value="**Custom VM + Heavy Obfuscation**", inline=False)
+        success_embed.set_footer(text=f"Sttar Obfuscator • Secured • {discord.utils.utcnow().strftime('%Y-%m-%d %H:%M')}")
         success_embed.timestamp = discord.utils.utcnow()
 
-        await interaction.edit_original_response(
-            embed=success_embed,
-            attachments=[discord_file]
-        )
+        # Send file
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(obfuscated_code)
+        
+        await interaction.followup.send(embed=success_embed, file=discord.File(filename))
+        
+        # Cleanup
+        os.remove(filename)
 
     except Exception as e:
         error_embed = discord.Embed(
-            title="❌ PROCESS ERROR",
-            description=f"An error occurred while processing: `{e}`",
-            color=0xFF0000
+            title="❌ Obfuscation Failed",
+            description=f"```Error: {str(e)}```",
+            color=0xEF4444
         )
-        await interaction.edit_original_response(embed=error_embed)
+        await interaction.followup.send(embed=error_embed)
 
+# Run Flask in thread
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
+
+# Main
 if __name__ == "__main__":
-    keep_alive()
-    time.sleep(2)
-
-    TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
+    TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
-        raise RuntimeError("Environment variable DISCORD_BOT_TOKEN is missing.")
-    bot.run(TOKEN)
+        print("DISCORD_TOKEN not found in .env")
+    else:
+        client.run(TOKEN)
