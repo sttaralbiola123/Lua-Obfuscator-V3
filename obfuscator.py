@@ -5,7 +5,7 @@ import time
 import hashlib
 
 def random_string(length=12):
-    """Generates a confusing sequence of i, l, I, 1 to throw off readers"""
+    """Generate a confusing string with similar-looking characters."""
     chars = ['i', 'l', 'I', '1', '0', 'O', 'o', '|', '/', '\\', '_', '-', '~']
     start_char = random.choice(['i', 'l', 'I', 'o', 'O', 'x', 'y', 'z'])
     return start_char + "".join(random.choice(chars) for _ in range(length - 1))
@@ -14,27 +14,26 @@ def random_number(min_val=100, max_val=9999):
     return random.randint(min_val, max_val)
 
 def hex_encode_string(source_str: str) -> str:
-    """Converts a standard text string into raw Lua byte escape codes (\\xXX)"""
+    """Convert string to Lua hex escape sequence (\\xXX)."""
     return "".join(f"\\x{ord(c):02x}" for c in source_str)
 
 def double_encode(source_str: str) -> str:
-    """Base64 then Hex encoding - 2 layers deep"""
+    """Base64 then hex encoding."""
     b64 = base64.b64encode(source_str.encode()).decode()
     return hex_encode_string(b64)
 
 def triple_encode(source_str: str) -> str:
-    """Compress + Base64 + Hex - 3 layers deep"""
+    """zlib compress → base64 → hex."""
     compressed = zlib.compress(source_str.encode())
     b64 = base64.b64encode(compressed).decode()
     return hex_encode_string(b64)
 
 def generate_signature(source_code: str) -> str:
-    """Generate unique signature for verification"""
-    hash_obj = hashlib.sha256(source_code.encode())
-    return hash_obj.hexdigest()[:32]
+    """Create a SHA256 signature of the original code."""
+    return hashlib.sha256(source_code.encode()).hexdigest()[:32]
 
 def generate_fake_functions(count=15) -> str:
-    """Generates decoy functions that look real but do nothing"""
+    """Decoy functions that look real but do nothing."""
     fake_funcs = []
     func_names = [
         "validate", "authenticate", "verify_token", "check_license",
@@ -42,7 +41,6 @@ def generate_fake_functions(count=15) -> str:
         "execute_bytecode", "load_library", "init_protect", "anti_tamper",
         "detect_injector", "hook_check", "memory_scan", "anti_debug"
     ]
-    
     for _ in range(count):
         name = random.choice(func_names) + "_" + random_string(5)
         fake_funcs.append(f"""
@@ -67,24 +65,20 @@ end
     return "".join(fake_funcs)
 
 def generate_string_splitting(hex_string: str) -> str:
-    """Splits hex string into multiple chunks with random concatenation"""
+    """Split a long hex string into shuffled chunks."""
     chunks = []
     chunk_size = random.randint(15, 40)
     for i in range(0, len(hex_string), chunk_size):
         chunks.append(f'"{hex_string[i:i+chunk_size]}"')
-    
     random.shuffle(chunks)
-    
-    # Create shuffle mapping
     original_order = list(range(len(chunks)))
     random.shuffle(original_order)
     reverse_map = {original_order[i]: i for i in range(len(original_order))}
-    
     split_code = f"""
 local function rebuild_string()
     local parts = {{ {", ".join(chunks)} }}
     local result = ""
-    local order = {{ {', '.join([str(reverse_map[i]) for i in range(len(chunks))])} }}
+    local order = {{ {', '.join(str(reverse_map[i]) for i in range(len(chunks)))} }}
     for i=1,#order do
         local idx = order[i] or i
         if parts[idx] then
@@ -99,37 +93,27 @@ end
     return split_code
 
 def generate_anti_ai_detection() -> str:
-    """Advanced Anti-AI / Anti-Analysis detection"""
+    """Advanced anti‑analysis layer."""
     var1 = random_string(8)
     var2 = random_string(10)
     var3 = random_string(6)
     var4 = random_string(12)
-    
     return f"""
 --[=[ ANTI-AI / ANTI-ANALYSIS LAYER ]=]
-
--- Detect if running in a decompiler/analyzer
 local {var1} = {{
     pcall(function() return debug and debug.getinfo end),
     pcall(function() return rawget(_G, "getfenv") end),
     pcall(function() return rawget(_G, "setfenv") end),
     pcall(function() return rawget(_G, "loadstring") end)
 }}
-
--- Stack trace obfuscation
 local {var2} = debug and debug.traceback or function() return "" end
 if type({var2}) == "function" and #{var2}() > 100 then
-    -- Fake stack trace to confuse
     local _ = {var2}(nil, {random_number(1,10)})
 end
-
--- Polymorphic identifier (changes each run)
 local {var3} = {{
     ["_"] = function(x) return not not x end,
     ["__"] = function(x) return not x end
 }}
-
--- Anti-Copy detection
 local {var4} = 0
 for i=1,{random_number(50,200)} do
     {var4} = {var4} + i
@@ -137,22 +121,18 @@ for i=1,{random_number(50,200)} do
         {var4} = {var4} % {random_number(100,999)}
     end
 end
-
 if {var4} == 0 then
-    -- This will never execute, but confuses static analyzers
     local _ = {{}}
     for _=1,{random_number(100,500)} do
         table.insert(_, string.char({random_number(65,90)}))
     end
 end
 """
-}
 
 def generate_anti_tamper() -> str:
-    """Anti-tamper protection that corrupts code if modified"""
+    """Basic tamper detection."""
     return f"""
 --[=[ ANTI-TAMPER PROTECTION ]=]
-
 local function {random_string(12)}()
     local c = 0
     local s = ""
@@ -165,29 +145,23 @@ local function {random_string(12)}()
     end
     return #s > 0
 end
-
--- Code integrity check
 local {random_string(10)} = (function()
     local _, chunk = pcall(function() 
         return debug and debug.getinfo(1, "S") 
     end)
     return chunk and chunk.source or "unknown"
 end)()
-
 if type({random_string(10)}) == "string" and #{random_string(10)} > 10 then
-    -- Integrity verified
+    -- integrity placeholder
 else
-    -- Tamper detected - corrupt execution
     error("[STTAR] Code integrity check failed")
 end
 """
-}
 
 def generate_control_flow_obfuscation() -> str:
-    """Complex control flow to confuse decompilers"""
+    """Junk control flow to confuse decompilers."""
     return f"""
 --[=[ CONTROL FLOW OBFUSCATION ]=]
-
 local function {random_string(12)}(n)
     if n <= 0 then return 0 end
     local t = {{}}
@@ -208,8 +182,6 @@ local function {random_string(12)}(n)
     end
     return r
 end
-
--- Junk loop that looks important
 local {random_string(8)} = 0
 for i=1,{random_number(200,800)} do
     local {random_string(5)} = i % {random_number(3,9)}
@@ -226,13 +198,11 @@ for i=1,{random_number(200,800)} do
     end
 end
 """
-}
 
 def generate_metadata_obfuscation() -> str:
-    """Hide metadata and strings"""
+    """Hide strings behind metatables."""
     return f"""
 --[=[ METADATA HIDING ]=]
-
 local {random_string(10)} = setmetatable({{}}, {{
     __index = function(t,k)
         local hidden = {{
@@ -243,8 +213,6 @@ local {random_string(10)} = setmetatable({{}}, {{
         return hidden[k] and hidden[k]() or nil
     end
 }})
-
--- String constant hiding
 local {random_string(8)} = (function()
     local chars = {{}}
     for i=1,{random_number(50,100)} do
@@ -253,20 +221,18 @@ local {random_string(8)} = (function()
     return table.concat(chars):sub({random_number(5,20)}, {random_number(30,50)})
 end)()
 """
-}
 
 def process_code(source_code: str, intensity: str = "extreme") -> str:
     """
-    Transforms standard Lua/Luau script into a layered configuration 
-    using hex representation, string mangling, and optional variable obfuscation.
+    Main obfuscation entry point.
+    Returns a fully obfuscated Lua script.
     """
     if not source_code.strip():
-        raise ValueError("Walang laman ang code na iyong ipinasok!")
-
+        raise ValueError("Input code is empty!")
     if len(source_code) > 150000:
-        raise ValueError("Masyadong malaki ang source code. Limitado ito sa 150,000 characters.")
+        raise ValueError("Source code too large (max 150k characters).")
 
-    # Determine encoding depth
+    # Choose encoding depth based on intensity
     if intensity == "extreme":
         encoded = triple_encode(source_code)
         encoding_type = "TRIPLE_LAYERED + ANTI-AI"
@@ -277,34 +243,21 @@ def process_code(source_code: str, intensity: str = "extreme") -> str:
         encoded = hex_encode_string(source_code)
         encoding_type = "SINGLE_LAYERED"
 
-    # Generate obfuscated names
-    vm_table = random_string(15)
-    decoder_func = random_string(12)
-    loader_func = random_string(11)
-    exec_var = random_string(10)
-    key_name = random_string(8)
-    table_name = random_string(14)
-    
-    # Generate signature
     signature = generate_signature(source_code)
-    
-    # Junk code generation
+
+    # Build junk layers
     junk_layers = ""
     for _ in range(random.randint(5, 15)):
         j_var = random_string(random.randint(10, 18))
         junk_layers += f"local {j_var} = {{ {random_number()}, {random_number()}, {random_number()} }};\n"
         junk_layers += f"table.sort({j_var}, function(a,b) return a > b end);\n"
         junk_layers += f"for i=1,#{j_var} do {j_var}[i] = {j_var}[i] + {random_number(1,50)} end\n"
-    
-    # String splitting for anti-ai
+
     string_split = generate_string_splitting(encoded) if intensity == "extreme" else ""
-    
-    # Multi-layer decryption function
+
     decryption_logic = f"""
-local function {decoder_func}(data)
+local function {random_string(12)}(data)
     if type(data) ~= "string" then return nil end
-    
-    -- Layer 1: Hex decode
     local function hex_to_str(hex)
         local str = ""
         local i = 1
@@ -319,11 +272,8 @@ local function {decoder_func}(data)
         end
         return str
     end
-    
     local layer1 = hex_to_str(data)
     if not layer1 or #layer1 == 0 then return nil end
-    
-    -- Layer 2: Base64 decode
     local function b64_decode(b64)
         local b64_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
         local result = ""
@@ -342,11 +292,8 @@ local function {decoder_func}(data)
         end
         return result
     end
-    
     local layer2 = b64_decode(layer1)
     if not layer2 or #layer2 == 0 then return nil end
-    
-    -- Layer 3: Decompress
     local success, layer3 = pcall(function()
         if string.find(layer2, "\\x78\\x9C") or string.find(layer2, "\\x78\\xDA") or string.find(layer2, "\\x78\\x01") then
             local func = loadstring or load
@@ -354,12 +301,10 @@ local function {decoder_func}(data)
         end
         return layer2
     end)
-    
     return success and layer3 or layer2
 end
 """
-    
-    # Final payload with all protections + credits
+
     final_template = f"""--[[ 
     ╔═══════════════════════════════════════════════════════╗
     ║     🔒 STTAR ULTRA OBFUSCATOR v3.0 🔒                ║
@@ -370,108 +315,40 @@ end
     ║  [STATUS: ACTIVE | ANTI-AI: ENABLED]                ║
     ╚═══════════════════════════════════════════════════════╝
 --]]
-
 --[=[ SIGNATURE: {signature} ]=]
 --[=[ TIMESTAMP: {time.time()} ]=]
-
-local {table_name} = {{}}
 
 {generate_anti_ai_detection()}
 {generate_anti_tamper()}
 {generate_control_flow_obfuscation()}
 {generate_metadata_obfuscation()}
-{generate_fake_functions(random.randint(10, 20))}
+{generate_fake_functions(random.randint(10,20))}
 {junk_layers}
 {string_split}
-
 {decryption_logic}
 
--- Main execution with anti-crash protection
-local {vm_table} = setmetatable({{}}, {{
-    __index = function(t,k)
-        local allowed = {{ "print", "warn", "error", "pcall", "xpcall", "select", "tonumber", "tostring", "type", "getmetatable", "setmetatable", "rawget", "rawset", "rawequal", "next", "pairs", "ipairs", "table", "string", "math", "bit" }}
-        for _,v in pairs(allowed) do
-            if k == v then return _G[v] end
-        end
-        return nil
-    end
-}})
-
-local {exec_var} = "{encoded if intensity != 'extreme' else 'SPLIT_STRING'}"
-
-local function {loader_func}(code_str)
-    local results = {{}}
-    local success, decrypted = pcall({decoder_func}, code_str)
-    
-    if not success or not decrypted then
-        return nil, "Decryption failed"
-    end
-    
-    -- Try multiple loading methods
-    local loaders = {{loadstring, load}}
-    for _,loader in ipairs(loaders) do
-        local success, chunk = pcall(loader, decrypted)
-        if success and chunk then
-            if setfenv then
-                setfenv(chunk, {vm_table})
-            end
-            return chunk
-        end
-    end
-    return nil
+local load_function = loadstring or load
+if not load_function then
+    error("This environment does not support dynamic code loading.")
 end
 
--- Execute with fallback
-local ready = nil
-local load_error = nil
-
-if type({exec_var}) == "string" and #{exec_var} > 0 then
-    ready, load_error = {loader_func}({exec_var})
-    if not ready and {string_split and "rebuild_string" or "false"} then
-        local rebuilt = rebuild_string()
-        if rebuilt and #rebuilt > 0 then
-            ready, load_error = {loader_func}(rebuilt)
-        end
-    end
+local encoded_str = "{encoded if intensity != 'extreme' else 'SPLIT_STRING'}"
+local final_code = encoded_str
+if encoded_str == "SPLIT_STRING" and rebuild_string then
+    final_code = rebuild_string()
 end
 
-if ready then
-    local success, result = pcall(ready)
-    if not success then
-        -- Silent fail, no print to avoid detection
-    end
-else
-    -- Protection active - no error messages
-    local _ = {{
-        [{random_string(8)}] = function() end,
-        [{random_string(8)}] = function() end
-    }}
-end
+local success, chunk = pcall(function()
+    local decrypted = {random_string(12)}(final_code)
+    return load_function(decrypted)
+end)
 
+if success and chunk then
+    pcall(chunk)
+end
 --[=[ END OF PROTECTED BLOCK ]=]
 -- Protected by: Sttar Albiola
 -- FB: Sttar Albiola
 """
-    
     return final_template
-
-
-# ============================================================
-# USAGE EXAMPLE
-# ============================================================
-
-if __name__ == "__main__":
-    sample_lua_code = """
-    print("Hello World!")
-    local players = game:GetService("Players")
-    local player = players.LocalPlayer
-    print("Player: " .. player.Name)
-    """
-    
-    obfuscated = process_code(sample_lua_code, "extreme")
-    print(obfuscated)
-    
-    # Save to file
-    with open("obfuscated_output.lua", "w", encoding="utf-8") as f:
-        f.write(obfuscated)
-    print("\n[+] Obfuscated code saved to obfuscated_output.lua")
+```
